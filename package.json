@@ -1,0 +1,41 @@
+{
+  "name": "clarity",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Clarity — RAG-powered Design Research Assistant",
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@clerk/nextjs": "^6",
+    "@supabase/supabase-js": "^2",
+    "framer-motion": "^12",
+    "lucide-react": "^0.511",
+    "next": "16.2.6",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "react-dropzone": "^14",
+    "react-hook-form": "^7",
+    "zustand": "^5",
+    "zod": "^3",
+    "@hookform/resolvers": "^5",
+    "pdf-parse": "^1.1.1",
+    "mammoth": "^1.9",
+    "uuid": "^11"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/pdf-parse": "^1",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/uuid": "^10",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.6",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
