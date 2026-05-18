@@ -18,6 +18,7 @@ export interface Message {
   sources_used?: string[];
   created_at: string;
   is_streaming?: boolean;
+  suggestions?: string[];
 }
 
 export interface ConversationHistory {

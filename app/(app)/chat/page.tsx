@@ -16,7 +16,9 @@ import {
 } from "lucide-react";
 import { useChatStore } from "@/store/chat.store";
 import { useDocumentsStore } from "@/store/documents.store";
+import { useSettingsStore } from "@/store/settings.store";
 import Header from "@/components/layout/Header";
+import { SuggestedQuestions } from "@/components/chat/SuggestedQuestions";
 import type { Message, Citation } from "@/types/chat.types";
 
 function CitationTag({ citation }: { citation: Citation }) {
@@ -154,6 +156,39 @@ export default function ChatPage() {
     } finally {
       setStreaming(false);
       setAgentStatus({ state: "done", agent: "", message: "" });
+
+      // Fetch suggested questions if enabled
+      const { showSuggestedQuestions, activeProvider, byokKeys } = useSettingsStore.getState();
+      if (showSuggestedQuestions) {
+        const lastMsg = useChatStore.getState().messages.slice(-1)[0];
+        if (lastMsg && lastMsg.role === "assistant") {
+          fetch("/api/chat/suggestions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              lastAnswer: lastMsg.content,
+              provider: activeProvider,
+              byokKey: byokKeys[activeProvider],
+            }),
+          })
+            .then((res) => res.json())
+            .then((data) => {
+              if (data.suggestions && data.suggestions.length > 0) {
+                useChatStore.setState((state) => {
+                  const msgs = [...state.messages];
+                  if (msgs.length > 0) {
+                    msgs[msgs.length - 1] = {
+                      ...msgs[msgs.length - 1],
+                      suggestions: data.suggestions,
+                    };
+                  }
+                  return { messages: msgs };
+                });
+              }
+            })
+            .catch(console.error);
+        }
+      }
     }
   };
 
@@ -246,8 +281,29 @@ export default function ChatPage() {
               </div>
             </div>
           ) : (
-            messages.map((msg) => (
-              <MessageBubble key={msg.id} message={msg} />
+            messages.map((msg, idx) => (
+              <div key={msg.id} style={{ width: "100%" }}>
+                <MessageBubble message={msg} />
+                {idx === messages.length - 1 &&
+                  msg.role === "assistant" &&
+                  msg.suggestions &&
+                  msg.suggestions.length > 0 &&
+                  !isStreaming && (
+                    <div style={{ paddingLeft: 44, paddingBottom: 16 }}>
+                      <SuggestedQuestions
+                        suggestions={msg.suggestions}
+                        onSelect={(q) => {
+                          useChatStore.setState((state) => {
+                            const msgs = [...state.messages];
+                            msgs[idx] = { ...msgs[idx], suggestions: undefined };
+                            return { messages: msgs };
+                          });
+                          handleSend(q);
+                        }}
+                      />
+                    </div>
+                  )}
+              </div>
             ))
           )}
           <div ref={messagesEndRef} />
@@ -300,16 +356,32 @@ export default function ChatPage() {
             </button>
           </div>
           <div className="chat-tools">
-            <button className="chat-tool-btn">
+            <button
+              className="chat-tool-btn"
+              onClick={() => handleSend("Answer this question using all uploaded documents.")}
+              disabled={isStreaming}
+            >
               <FileText size={12} strokeWidth={2} /> All docs
             </button>
-            <button className="chat-tool-btn">
+            <button
+              className="chat-tool-btn"
+              onClick={() => handleSend("Find all contradictions and conflicting statements across the selected documents. List each conflict with the source documents.")}
+              disabled={isStreaming}
+            >
               <AlertTriangle size={12} strokeWidth={2} /> Find contradictions
             </button>
-            <button className="chat-tool-btn">
+            <button
+              className="chat-tool-btn"
+              onClick={() => handleSend("Identify missing information, weak sections, and unanswered questions in these documents. What gaps should be addressed?")}
+              disabled={isStreaming}
+            >
               <CircleDashed size={12} strokeWidth={2} /> Find gaps
             </button>
-            <button className="chat-tool-btn">
+            <button
+              className="chat-tool-btn"
+              onClick={() => handleSend("Create a structured summary with key themes, decisions, stakeholders, and open questions across all uploaded documents.")}
+              disabled={isStreaming}
+            >
               <LayoutList size={12} strokeWidth={2} /> Summarise
             </button>
           </div>

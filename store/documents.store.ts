@@ -13,6 +13,7 @@ interface DocumentsState {
   addDocument: (doc: DocumentRecord) => void;
   updateDocument: (id: string, updates: Partial<DocumentRecord>) => void;
   removeDocument: (id: string) => void;
+  clearDocuments: () => void;
   setUploading: (uploading: boolean) => void;
   setUploadProgress: (docId: string, progress: number) => void;
 }
@@ -38,6 +39,8 @@ export const useDocumentsStore = create<DocumentsState>((set) => ({
     set((state) => ({
       documents: state.documents.filter((d) => d.id !== id),
     })),
+
+  clearDocuments: () => set({ documents: [], uploadProgress: {} }),
 
   setUploading: (isUploading) => set({ isUploading }),
 

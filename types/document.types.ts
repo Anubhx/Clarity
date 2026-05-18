@@ -14,6 +14,8 @@ export interface DocumentRecord {
   created_at: string;
   updated_at: string;
   user_id: string;
+  /** Cached analysis result stored as JSONB in Supabase */
+  health_data?: Record<string, unknown>;
 }
 
 export interface DocumentChunk {

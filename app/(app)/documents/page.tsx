@@ -11,6 +11,7 @@ import {
   CheckCircle,
   Loader2,
   Sparkles,
+  Trash2,
 } from "lucide-react";
 import Header from "@/components/layout/Header";
 import { useDocumentsStore } from "@/store/documents.store";
@@ -21,6 +22,7 @@ export default function DocumentsPage() {
   const { user } = useUser();
   const [searchQuery, setSearchQuery] = useState("");
   const [showUpload, setShowUpload] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const {
     documents,
     isUploading,
@@ -40,6 +42,23 @@ export default function DocumentsPage() {
       .then((data) => setDocuments(data.documents || []))
       .catch(console.error);
   }, [user?.id, setDocuments]);
+
+  const handleDeleteDoc = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!window.confirm("Are you sure you want to delete this document?")) return;
+    
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/documents/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete document");
+      useDocumentsStore.getState().removeDocument(id);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to delete document. Please try again.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
@@ -207,26 +226,39 @@ export default function DocumentsPage() {
 
         {/* Document Grid */}
         {filteredDocs.length > 0 ? (
-          <div className="g3">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
             {filteredDocs.map((doc) => (
               <div key={doc.id} className="doc-card">
-                <div className="doc-card-top">
-                  <div>
+                <div className="doc-card-top" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <div className={cn("doc-icon", doc.type === "research" && "amber", doc.type === "competitive" && "coral")}>
                       <FileText size={18} strokeWidth={1.75} />
                     </div>
+                    {doc.status === "ready" ? (
+                      <span className="tag tag-green">
+                        <CheckCircle size={10} strokeWidth={2} /> Ready
+                      </span>
+                    ) : doc.status === "error" ? (
+                      <span className="tag tag-coral">Error</span>
+                    ) : (
+                      <span className="tag tag-amber">
+                        <Loader2 size={10} strokeWidth={2} className="animate-spin" /> Indexing
+                      </span>
+                    )}
                   </div>
-                  {doc.status === "ready" ? (
-                    <span className="tag tag-green">
-                      <CheckCircle size={10} strokeWidth={2} /> Ready
-                    </span>
-                  ) : doc.status === "error" ? (
-                    <span className="tag tag-coral">Error</span>
-                  ) : (
-                    <span className="tag tag-amber">
-                      <Loader2 size={10} strokeWidth={2} className="animate-spin" /> Indexing
-                    </span>
-                  )}
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    style={{ padding: 4, height: 26, color: "var(--color-coral)" }}
+                    onClick={(e) => handleDeleteDoc(doc.id, e)}
+                    disabled={deletingId === doc.id}
+                    title="Delete document"
+                  >
+                    {deletingId === doc.id ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <Trash2 size={14} />
+                    )}
+                  </button>
                 </div>
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>

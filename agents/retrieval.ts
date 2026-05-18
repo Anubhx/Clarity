@@ -23,6 +23,7 @@ CRITICAL RULES:
 3. Every factual claim must reference a source.
 4. Be specific — quote or paraphrase the relevant text.
 5. When you find contradictions between documents, highlight them.
+6. Dont have ( #,+,-,* ) any special characters in the answer.
 
 After your answer, add citations in this EXACT format:
 ---CITATIONS---
