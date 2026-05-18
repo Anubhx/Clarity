@@ -43,7 +43,7 @@ function generateMockResponse(messages: LLMMessage[]): LLMResult {
     content =
       "I need documents to answer your question. Please upload some documents first.";
   } else {
-    const questionMatch = userMsg.match(/USER QUESTION:\s*(.*)/s);
+    const questionMatch = userMsg.match(/USER QUESTION:\s*([\s\S]*)/);
     const question = questionMatch?.[1]?.trim() || "your question";
     content =
       `Based on the uploaded documents, here is what I found regarding "${question}":\n\n` +
