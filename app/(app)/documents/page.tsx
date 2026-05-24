@@ -95,7 +95,11 @@ export default function DocumentsPage() {
 
           setUploadProgress(tempId, 80);
 
-          if (!res.ok) throw new Error("Upload failed");
+          if (!res.ok) {
+            const errorData = await res.json().catch(() => ({}));
+            console.error("Upload API error:", errorData);
+            throw new Error(`Upload failed: ${errorData.error || 'unknown'}`);
+          }
           const data = await res.json();
 
           setUploadProgress(tempId, 100);
