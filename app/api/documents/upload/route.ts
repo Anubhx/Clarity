@@ -14,9 +14,11 @@ import type { DocType } from "@/types/document.types";
 import { MAX_FILE_SIZE_BYTES, SUPPORTED_EXTENSIONS } from "@/config/constants";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  console.log("[Upload] Route called");
   try {
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
+    console.log("[Upload] FormData received, file:", file?.name);
     const docType = (formData.get("type") as DocType) || "other";
     const userId = formData.get("userId") as string;
 
@@ -122,9 +124,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       word_count: parsed.wordCount,
     });
   } catch (error) {
-    console.error("[Upload] Error:", error);
+    console.error("[Upload] Fatal Error:", error);
+    const msg = error instanceof Error ? error.message : String(error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Upload failed" },
+      { error: msg || "Unknown upload error" },
       { status: 500 }
     );
   }

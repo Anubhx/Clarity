@@ -43,8 +43,9 @@ async function parsePdf(buffer: Buffer): Promise<ParseResult> {
       pageCount: data.numpages,
     };
   } catch (err) {
-    console.error("[Parser] PDF parse failed:", err);
-    throw new Error("Failed to parse PDF file");
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[Parser] PDF parse failed:", msg);
+    throw new Error(`PDF parsing failed: ${msg}`);
   }
 }
 
