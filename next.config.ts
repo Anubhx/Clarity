@@ -11,6 +11,14 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "50mb",
     },
   },
+  async rewrites() {
+    return [
+      {
+        source: '/__clerk/(.*)',
+        destination: 'https://clerk.withclarity.vercel.app/__clerk/:path*',
+      },
+    ];
+  },
 };
 
 export default nextConfig;
