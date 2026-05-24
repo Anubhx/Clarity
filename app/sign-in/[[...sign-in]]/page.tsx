@@ -31,6 +31,9 @@ export default function SignInPage() {
       </div>
       <div className="auth-right">
         <SignIn
+          routing="path"
+          path="/sign-in"
+          fallbackRedirectUrl="/chat"
           appearance={{
             elements: {
               rootBox: "w-full max-w-[380px]",
