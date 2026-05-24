@@ -10,23 +10,32 @@ const keys = (process.env.GEMINI_API_KEYS || "")
 const rotator = new KeyRotator("GeminiEmbeddings", keys);
 
 /**
- * Generate a 768-dimensional vector embedding for the given text
- * using Google Gemini's text-embedding-004 model.
+ * Generate a 1536-dimensional vector embedding for the given text
+ * using Google Gemini's gemini-embedding-001 model (native 3072d, truncated
+ * to 1536 via Matryoshka subspace to match the Supabase vector(1536) column).
+ *
+ * Returns null if all keys are exhausted or rate-limited — callers
+ * should handle null gracefully and fall back to FTS-only search.
  */
-export async function generateEmbedding(text: string): Promise<number[]> {
+export async function generateEmbedding(text: string): Promise<number[] | null> {
   for (let i = 0; i < rotator.keyCount; i++) {
     const keyInfo = rotator.getNextKey();
     if (!keyInfo) break;
 
     try {
       const genAI = new GoogleGenerativeAI(keyInfo.key);
-      const model = genAI.getGenerativeModel({ model: "text-embedding-004" });
+      const model = genAI.getGenerativeModel({ model: "gemini-embedding-001" });
       
-      const result = await model.embedContent(text);
+      const result = await model.embedContent({
+        content: { parts: [{ text }], role: "user" },
+        taskType: "RETRIEVAL_DOCUMENT",
+      } as Parameters<typeof model.embedContent>[0]);
       const embedding = result.embedding;
       
       rotator.markSuccess(keyInfo.index);
-      return embedding.values;
+      // gemini-embedding-001 outputs 3072d; truncate to 1536 to match vector(1536) in Supabase.
+      // Matryoshka models preserve quality in leading dimensions.
+      return embedding.values.slice(0, 1536);
     } catch (err) {
       const status = extractStatus(err);
       const msg = err instanceof Error ? err.message : String(err);
@@ -34,7 +43,8 @@ export async function generateEmbedding(text: string): Promise<number[]> {
     }
   }
   
-  throw new Error("Failed to generate embedding: All Gemini API keys exhausted or rate limited.");
+  console.warn("[Embeddings] All keys exhausted — storing chunk without embedding (FTS fallback active).");
+  return null;
 }
 
 function extractStatus(err: unknown): number {
