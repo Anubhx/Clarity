@@ -15,20 +15,41 @@ interface RetrievalResult {
   sources_used: string[];
 }
 
-const SYSTEM_PROMPT = `You are Clarity, a design research assistant. You answer questions ONLY using the document context provided below.
+const SYSTEM_PROMPT = `You are Clarity, a design research assistant. You answer questions ONLY using the document context provided.
 
-CRITICAL RULES:
-1. Answer ONLY from the provided context. Never use outside knowledge.
-2. If the context does not contain the answer, say "I could not find this in the uploaded documents."
-3. Every factual claim must reference a source.
+CRITICAL OUTPUT RULES — VIOLATION = INVALID RESPONSE:
+1. Answer ONLY from the provided document context. Never use outside knowledge.
+2. If the context does not contain the answer, say: I could not find this in the uploaded documents.
+3. Every factual claim must reference a source by name.
 4. Be specific — quote or paraphrase the relevant text.
-5. When you find contradictions between documents, highlight them.
-6. Dont have ( #,+,-,* ,**) any special characters in the answer.
+5. When you find contradictions between documents, highlight them clearly.
+6. ABSOLUTE PROHIBITION: Do NOT use ** for bold, * for italics, # for headings, _ for underscores, - as bullet points, or any other markdown syntax.
+7. Write in plain prose paragraphs. If listing items, use numbers: 1. 2. 3.
+8. Keep responses concise and scannable.
 
 After your answer, add citations in this EXACT format:
 ---CITATIONS---
 [{"claim":"the specific claim","doc_name":"document name","section":"section if known","excerpt":"exact quote from the source"}]
 ---END_CITATIONS---`;
+
+
+/**
+ * Strip all markdown formatting from a string.
+ * This is a server-side safety net — the LLM sometimes ignores prompt rules.
+ */
+function cleanMarkdown(text: string): string {
+  return text
+    .replace(/\*\*([^*]*?)\*\*/g, "$1")   // **bold** → bold
+    .replace(/\*([^*]*?)\*/g, "$1")        // *italic* → italic
+    .replace(/_{2}([^_]*?)_{2}/g, "$1")    // __bold__ → bold
+    .replace(/_([^_]*?)_/g, "$1")          // _italic_ → italic
+    .replace(/^#{1,6}\s+/gm, "")           // # Heading → Heading
+    .replace(/^\s*[-*+]\s+/gm, "")        // - bullet → (removed)
+    .replace(/`([^`]*?)`/g, "$1")          // `code` → code
+    .replace(/\*+/g, "")                   // Any leftover stray *
+    .replace(/\n{3,}/g, "\n\n")           // Collapse excess blank lines
+    .trim();
+}
 
 function buildContextPrompt(
   chunks: (DocumentChunk & { similarity: number })[]
@@ -44,29 +65,40 @@ function buildContextPrompt(
 function extractCitations(
   response: string
 ): { answer: string; citations: Citation[] } {
-  const citationMatch = response.match(
-    /---CITATIONS---\s*([\s\S]*?)\s*---END_CITATIONS---/
-  );
   let citations: Citation[] = [];
   let answer = response;
 
-  if (citationMatch) {
-    answer = response.slice(0, response.indexOf("---CITATIONS---")).trim();
-    try {
-      const parsed = JSON.parse(citationMatch[1]);
-      citations = Array.isArray(parsed)
-        ? parsed.map((c: Record<string, string>) => ({
-            claim: c.claim || "",
-            doc_name: c.doc_name || "",
-            chunk_id: c.chunk_id || "",
-            section: c.section,
-            excerpt: (c.excerpt || "").slice(0, 200),
-          }))
-        : [];
-    } catch {
-      // If citation parsing fails, still return the answer
-      citations = [];
-    }
+  const citationStart = response.indexOf("---CITATIONS---");
+  if (citationStart === -1) {
+    return { answer, citations };
+  }
+
+  // Always strip everything from ---CITATIONS--- onwards from the visible answer
+  // Then sanitize any markdown the LLM emitted despite our instructions
+  answer = cleanMarkdown(response.slice(0, citationStart));
+
+  // Extract the JSON block — handle both with and without ---END_CITATIONS---
+  const afterMarker = response.slice(citationStart + "---CITATIONS---".length);
+  const endIndex = afterMarker.indexOf("---END_CITATIONS---");
+  const jsonStr = (endIndex !== -1
+    ? afterMarker.slice(0, endIndex)
+    : afterMarker
+  ).trim();
+
+  try {
+    const parsed = JSON.parse(jsonStr);
+    citations = Array.isArray(parsed)
+      ? parsed.map((c: Record<string, string>) => ({
+          claim: c.claim || "",
+          doc_name: c.doc_name || "",
+          chunk_id: c.chunk_id || "",
+          section: c.section,
+          excerpt: (c.excerpt || "").slice(0, 200),
+        }))
+      : [];
+  } catch {
+    // Citation JSON malformed — answer is already clean, just return empty citations
+    citations = [];
   }
 
   return { answer, citations };

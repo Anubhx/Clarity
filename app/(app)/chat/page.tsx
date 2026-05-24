@@ -31,8 +31,27 @@ function CitationTag({ citation }: { citation: Citation }) {
   );
 }
 
+/** Strip any residual markdown symbols the LLM emits despite server-side cleaning */
+function sanitize(text: string): string {
+  return text
+    .replace(/\*\*([\s\S]*?)\*\*/g, "$1")  // **bold** → bold (cross-line)
+    .replace(/\*([\s\S]*?)\*/g, "$1")       // *italic* → italic (cross-line)
+    .replace(/_{2}([\s\S]*?)_{2}/g, "$1")  // __bold__ → bold
+    .replace(/_([\s\S]*?)_/g, "$1")         // _italic_ → italic
+    .replace(/^#{1,6}\s+/gm, "")            // # headings → plain
+    .replace(/^[-*+]\s+/gm, "")             // leading - * + bullets → removed
+    .replace(/`([\s\S]*?)`/g, "$1")         // `code` → plain
+    .replace(/\*+/g, "")                    // any leftover stray * chars
+    .replace(/\n{3,}/g, "\n\n")             // collapse excess blank lines
+    .trim();
+}
+
 function MessageBubble({ message }: { message: Message }) {
   const isUser = message.role === "user";
+  const raw = sanitize(message.content);
+
+  // Split into paragraphs
+  const paragraphs = raw.split(/\n{2,}/).filter(Boolean);
 
   return (
     <div className={`msg-row ${isUser ? "user" : ""}`}>
@@ -40,9 +59,38 @@ function MessageBubble({ message }: { message: Message }) {
         {isUser ? "U" : "C"}
       </div>
       <div className={`msg-bubble ${isUser ? "user" : ""} ${message.is_streaming ? "streaming" : ""}`}>
-        {message.content.split("\n").map((para, i) => (
-          <p key={i}>{para}</p>
-        ))}
+        {isUser ? (
+          <p>{raw}</p>
+        ) : (
+          paragraphs.map((para, i) => {
+            // Detect numbered list block (lines starting with "1." "2." etc.)
+            const lines = para.split("\n");
+            const isNumberedList = lines.length > 1 && lines.every(l => /^\d+\.\s/.test(l.trim()));
+
+            if (isNumberedList) {
+              return (
+                <ol key={i} style={{ paddingLeft: 18, margin: "6px 0" }}>
+                  {lines.map((line, j) => (
+                    <li key={j} style={{ marginBottom: 4, fontSize: 14, lineHeight: 1.6 }}>
+                      {line.replace(/^\d+\.\s+/, "")}
+                    </li>
+                  ))}
+                </ol>
+              );
+            }
+
+            // Single line that looks like a numbered item
+            if (/^\d+\.\s/.test(para.trim())) {
+              return (
+                <p key={i} style={{ margin: "4px 0" }}>
+                  {para.replace(/^\d+\.\s+/, `${para.match(/^(\d+)\./)?.[1]}. `)}
+                </p>
+              );
+            }
+
+            return <p key={i} style={{ margin: "4px 0" }}>{para}</p>;
+          })
+        )}
         {message.citations && message.citations.length > 0 && (
           <div className="citation-row">
             {message.citations.map((c, i) => (
