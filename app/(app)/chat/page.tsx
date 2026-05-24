@@ -19,6 +19,7 @@ import { useDocumentsStore } from "@/store/documents.store";
 import { useSettingsStore } from "@/store/settings.store";
 import Header from "@/components/layout/Header";
 import { SuggestedQuestions } from "@/components/chat/SuggestedQuestions";
+import { DocumentSelector } from "@/components/chat/DocumentSelector";
 import type { Message, Citation } from "@/types/chat.types";
 
 function CitationTag({ citation }: { citation: Citation }) {
@@ -119,6 +120,7 @@ export default function ChatPage() {
     messages,
     isStreaming,
     agentStatus,
+    activeDocIds,
     addMessage,
     updateLastMessage,
     setStreaming,
@@ -172,7 +174,8 @@ export default function ChatPage() {
         body: JSON.stringify({
           message: text,
           conversation_history: messages.filter((m) => !m.is_streaming),
-          document_ids: readyDocs.map((d) => d.id),
+          // Use selected docs if any, else pass all ready doc IDs
+          document_ids: activeDocIds.length > 0 ? activeDocIds : readyDocs.map((d) => d.id),
         }),
       });
 
@@ -383,6 +386,12 @@ export default function ChatPage() {
 
         {/* Chat Input */}
         <div className="chat-input-area">
+          {/* Document Selector */}
+          {readyDocs.length > 0 && (
+            <div style={{ paddingBottom: 6 }}>
+              <DocumentSelector />
+            </div>
+          )}
           <div className="chat-input-wrap">
             <textarea
               ref={textareaRef}
