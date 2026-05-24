@@ -5,6 +5,7 @@
  */
 
 import { getServerSupabase } from "./supabase";
+import { generateEmbedding } from "./embeddings";
 import type { DocumentChunk } from "@/types/document.types";
 
 /** Upsert a chunk into the store */
@@ -22,6 +23,7 @@ export async function upsertChunk(chunk: DocumentChunk): Promise<void> {
     char_start: chunk.char_start,
     char_end: chunk.char_end,
     token_count: chunk.token_count,
+    embedding: chunk.embedding,
     created_at: chunk.created_at,
   });
 
@@ -45,6 +47,7 @@ export async function upsertChunks(chunks: DocumentChunk[]): Promise<void> {
       char_start: chunk.char_start,
       char_end: chunk.char_end,
       token_count: chunk.token_count,
+      embedding: chunk.embedding,
       created_at: chunk.created_at,
     }));
 
@@ -61,7 +64,28 @@ export async function searchDocuments(
 ): Promise<(DocumentChunk & { similarity: number })[]> {
   const supabase = getServerSupabase();
 
-  // Strategy 1: Full-text search using Supabase textSearch
+  // Strategy 1: Vector similarity search using Gemini embeddings (Primary)
+  try {
+    const queryEmbedding = await generateEmbedding(query);
+    
+    const { data, error } = await supabase.rpc("match_documents", {
+      query_embedding: queryEmbedding,
+      match_threshold: 0.3,
+      match_count: topK,
+      filter_doc_ids: docIds?.length ? docIds : null,
+    });
+
+    if (!error && data && data.length > 0) {
+      console.log(`[VectorStore] Vector search found ${data.length} chunks`);
+      return mapRows(data);
+    } else if (error) {
+      console.warn(`[VectorStore] Vector search error: ${error.message}`);
+    }
+  } catch (e) {
+    console.log("[VectorStore] Vector search failed, falling back to FTS...", e);
+  }
+
+  // Strategy 2: Full-text search using Supabase textSearch (Fallback)
   try {
     // Convert query to tsquery-compatible format
     const tsQuery = query
@@ -158,7 +182,7 @@ function mapRows(
     char_end: row.char_end as number,
     token_count: row.token_count as number,
     created_at: row.created_at as string,
-    similarity: 0.8,
+    similarity: (row.similarity as number) ?? (row.rank ? (row.rank as number) : 0.8),
   }));
 }
 

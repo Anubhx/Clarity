@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS document_chunks (
   char_start INTEGER NOT NULL,
   char_end INTEGER NOT NULL,
   token_count INTEGER NOT NULL,
-  embedding vector(1536),
+  embedding vector(768),
   fts tsvector GENERATED ALWAYS AS (to_tsvector('english', content)) STORED,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -50,7 +50,7 @@ CREATE INDEX IF NOT EXISTS idx_chunks_embedding ON document_chunks
 
 -- Step 6: Vector similarity search function
 CREATE OR REPLACE FUNCTION match_documents(
-  query_embedding vector(1536),
+  query_embedding vector(768),
   match_threshold FLOAT DEFAULT 0.5,
   match_count INT DEFAULT 8,
   filter_doc_ids UUID[] DEFAULT NULL
