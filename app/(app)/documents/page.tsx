@@ -96,9 +96,13 @@ export default function DocumentsPage() {
           setUploadProgress(tempId, 80);
 
           if (!res.ok) {
-            const errorData = await res.json().catch(() => ({}));
-            console.error("Upload API error:", errorData);
-            throw new Error(`Upload failed: ${errorData.error || 'unknown'}`);
+            const rawText = await res.text();
+            console.error("Raw server error response:", rawText.slice(0, 500));
+            
+            let errorData: any = {};
+            try { errorData = JSON.parse(rawText); } catch (e) {}
+            
+            throw new Error(`Upload failed: ${errorData.error || rawText.slice(0, 60)}`);
           }
           const data = await res.json();
 
